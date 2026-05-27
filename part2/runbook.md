@@ -1,5 +1,20 @@
 # Runbook — team-alpha-backend: Memory Exhaustion / OOMKill
 
+<!--
+What makes a good runbook (the rubric for this task):
+
+- Specific, copy-pastable commands. Not "check the logs" — the actual
+  `kubectl logs` invocation, with namespace and label selector.
+- No "read the docs" or "see the dashboard" links without a panel name or
+  query. At 03:00, indirection is a tax.
+- Tested with the on-call cohort. A runbook that the original author can
+  follow but a colleague can't is a draft, not a runbook.
+- Written so the *least senior* responder can execute it confidently.
+- Branching is explicit: "if X, do Y; otherwise Z" rather than narrative prose.
+
+Aim for this standard in your answer.
+-->
+
 ## Overview
 
 **Alert**: `ContainerMemoryUsageCritical`

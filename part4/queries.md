@@ -19,6 +19,25 @@ You have access to:
 
 Write PromQL queries to answer each question. Add your query below each prompt.
 
+> **Worked example — the level of detail we are looking for.**
+> "Show 5xx rate per pod over the last 5 minutes, scoped to team-alpha":
+>
+> ```promql
+> # Per-pod 5xx rate, scoped to team-alpha namespace.
+> # 5m window matches dashboard cadence; rate() handles counter resets.
+> sum by (pod) (
+>   rate(http_requests_total{
+>     namespace="team-alpha",
+>     job="team-alpha-backend",
+>     status_code=~"5.."
+>   }[5m])
+> )
+> ```
+>
+> Labelled, scoped, commented, with a window that matches the incident
+> timescale. Aim for this fidelity in your answers below — not a bare
+> one-liner without label filters.
+
 ### A1. What is the current error rate for `team-alpha-backend`?
 
 ```promql

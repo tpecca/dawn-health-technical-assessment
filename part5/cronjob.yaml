@@ -1,9 +1,15 @@
 # Part 5.2 — Starter: Stale Resource Cleanup CronJob
 #
 # On a shared AKS cluster, completed and failed pods accumulate over time.
-# Kubernetes does not automatically garbage-collect them. This creates noise
-# in kubectl output, gradually consumes etcd storage, and makes it harder
-# to spot real problems at a glance.
+# Kubernetes does provide `ttlSecondsAfterFinished` on Jobs and an automatic
+# pod garbage collector — for this task, treat that as a useful but
+# incomplete first line of defence. We want a belt-and-braces sweep that
+# catches anything missed (Pods orphaned from deleted Jobs, evicted Pods,
+# old Failed Pods retained for triage that nobody followed up on).
+#
+# If you can think of a more interesting target than "Succeeded/Failed pods"
+# given the GC already covers most cases (e.g. evicted pods, completed
+# Argo Workflows, orphaned ConfigMaps), call that out in SUBMISSION.md.
 #
 # Your tasks:
 #   1. Complete the CronJob so that it:
@@ -13,7 +19,9 @@
 #      - Deletes all completed Jobs (those with status.conditions type=Complete)
 #        that are older than 24 hours
 #
-#   2. Add a ServiceAccount named platform-cleanup-sa in the argocd namespace.
+#   2. Add a ServiceAccount named platform-cleanup-sa in the platform-system
+#      namespace (create the Namespace too if you want — do not co-locate
+#      platform automation in the argocd namespace).
 #
 #   3. Add a ClusterRole granting only the permissions this job actually needs
 #      (principle of least privilege — think carefully about which verbs and
@@ -23,18 +31,34 @@
 #
 # All resources should be in this file, separated by ---
 #
-# Note: This job runs cluster-wide. Add a comment explaining why a ClusterRole
-# is required here rather than a namespaced Role, and what the security
-# implications are of granting cluster-wide delete on pods and jobs.
+# A couple of things to address in SUBMISSION.md alongside the manifest:
+#   - Why a ClusterRole is required here rather than a namespaced Role.
+#   - The security implications of granting cluster-wide get/list/delete on
+#     pods and jobs in a multi-tenant cluster handling PHI — pod names,
+#     labels, owner references, and image tags can leak tenant context.
+#     What would you do to mitigate (e.g. audit logging, narrower verb set,
+#     specific labelSelector enforcement via an admission policy)?
 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-system
+  labels:
+    # Marks this namespace as belonging to the platform team, not a product tenant.
+    dawnhealth.com/owner: platform
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: cleanup-stale-resources
-  namespace: argocd
+  namespace: platform-system
 spec:
   schedule: "TODO"         # TODO: Set a cron schedule that runs every hour
-  concurrencyPolicy: Forbid
+  # Replace cancels any still-running prior instance before starting a new one.
+  # Cleanup is short and idempotent, so we prefer Replace over Forbid to avoid
+  # piling up if a previous run hangs on a slow API server. Defensible either way —
+  # justify your choice in SUBMISSION.md if you change it.
+  concurrencyPolicy: Replace
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
   jobTemplate:
@@ -45,7 +69,9 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: kubectl
-              image: bitnami/kubectl:latest
+              # Pinned digest/tag — avoid :latest in any manifest, especially
+              # one with cluster-wide delete permissions.
+              image: bitnami/kubectl:1.30.3
               command:
                 - /bin/sh
                 - -c

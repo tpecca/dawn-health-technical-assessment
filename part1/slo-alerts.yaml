@@ -1,25 +1,32 @@
 # Part 1.2 — Starter: Multi-Window SLO Burn-Rate Alerts
 #
 # SLO: 99.9% of requests to team-alpha-backend succeed over a rolling 28-day window.
-# This means the error budget is 0.1% of requests — or approximately 43 minutes of
-# complete outage per month.
+# This means the error budget is 0.1% of requests — or approximately 40 minutes
+# of complete outage per 28-day window (0.001 * 28 * 24 * 60 ≈ 40.3 min).
 #
 # Multi-window, multi-burn-rate alerting (Google SRE Workbook §5) avoids the
 # pitfalls of simple threshold alerts:
 #   - A fast burn alert fires early when the error rate is critically high,
 #     even if it has only been happening for a few minutes.
 #   - A slow burn alert fires when a lower error rate is sustained long enough
-#     to meaningfully erode the monthly budget.
+#     to meaningfully erode the 28-day budget.
 #
-# Burn rate = (observed error rate) / (SLO error budget)
+# Burn rate = (observed error rate) / (1 - SLO)
 # At a burn rate of 1x, the budget is exhausted exactly at the end of the window.
-# At 14x, a 99.9% SLO's monthly budget is consumed in roughly 2 days.
+# For a 99.9% SLO (budget = 0.1%):
+#   - 14x burn rate consumes the full 28-day budget in ~2 days
+#   - 6x burn rate consumes it in ~4.7 days
 #
 # Your tasks:
 #   1. Complete the PromQL expr for both alerts using the recording rules
 #      produced in Part 1.1.
 #   2. The burn-rate thresholds are provided in comments — use them correctly.
 #   3. Fill in the description and action annotations with meaningful content.
+#
+# Note on recording rules: Part 1.1 ships a 5m ratio. You will also need a 1h
+# ratio for the fast-burn alert and a 6h ratio for the slow-burn alert. Either
+# extend part1/recording-rules.yaml with the additional windows, or define them
+# inline here — your choice, document it.
 
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -34,18 +41,17 @@ spec:
       rules:
 
         # Fast burn — critical
-        # Fires when the error rate is high enough to exhaust the monthly budget in ~2 days.
+        # Fires when the error rate is high enough to exhaust the 28-day budget in ~2 days.
         # Uses two windows: a long window (1h) to confirm the trend, and a short window (5m)
         # to confirm it is still happening now. Both must exceed the burn-rate threshold.
-        # Threshold for 99.9% SLO: 14x burn rate = error ratio > 0.14 (14%)
+        # Threshold for 99.9% SLO: 14x burn rate = error ratio > 0.014 (1.4%)
         - alert: TeamAlphaBackendHighErrorBudgetBurn
           expr: |
-            # TODO: Express the condition using the recording rules from Part 1.1.
+            # TODO: Express the condition using the recording rules from Part 1.1
+            # (you will need a 1h ratio rule — add one if you have not already).
             # The alert should fire when BOTH of the following are true:
-            #   - The 1h error ratio exceeds 14x the SLO error rate (0.1% * 14 = 1.4%)
+            #   - The 1h error ratio exceeds 14x the SLO error rate (0.1% * 14 = 1.4%, i.e. > 0.014)
             #   - The 5m error ratio also exceeds 14x (confirms it is still active)
-            # Use job:http_errors_total:ratio_rate5m (or an equivalent 1h version if you
-            # define one) and compare against the appropriate threshold.
             TODO
           for: 2m
           labels:
@@ -56,7 +62,7 @@ spec:
             summary: "High error budget burn on team-alpha-backend ({{ $value | humanizePercentage }} error rate)"
             description: |
               TODO: Explain what this alert means in terms of error budget.
-              At the current burn rate, how quickly will the monthly budget be exhausted?
+              At the current burn rate, how quickly will the 28-day budget be exhausted?
               What is the patient-facing impact?
             action: |
               TODO: List the first 3 steps an on-call engineer should take immediately.
@@ -65,7 +71,7 @@ spec:
         # Slow burn — warning
         # Fires when a lower but sustained error rate will exhaust the budget within ~5 days.
         # Uses longer windows: 6h and 30m.
-        # Threshold for 99.9% SLO: 6x burn rate = error ratio > 0.6% over 6h
+        # Threshold for 99.9% SLO: 6x burn rate = error ratio > 0.006 (0.6%)
         - alert: TeamAlphaBackendMediumErrorBudgetBurn
           expr: |
             # TODO: Same pattern as above but using 6h and 30m windows.
@@ -80,7 +86,7 @@ spec:
           annotations:
             summary: "Elevated error budget burn on team-alpha-backend ({{ $value | humanizePercentage }} error rate)"
             description: |
-              TODO: Explain the impact of this burn rate on the monthly error budget.
+              TODO: Explain the impact of this burn rate on the 28-day error budget.
               At 6x burn rate, when will the budget be exhausted?
             action: |
               TODO: First 3 steps an on-call engineer should take.
