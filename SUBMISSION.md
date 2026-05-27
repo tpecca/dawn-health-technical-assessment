@@ -16,7 +16,7 @@
 
 ### 1.3 — SLO Policy
 
-> What SLO target would you propose for a patient-facing API, and how would you justify it to product stakeholders who want to move fast? How would you use the error budget to govern releases — specifically, to decide whether a release should proceed? What should happen when the error budget is exhausted?
+> What SLO target would you propose for a patient-facing API, and how would you justify it to product stakeholders who want to move fast? How would you use the error budget to govern releases, in particular to decide whether a release should proceed? What should happen when the error budget is exhausted?
 
 _Your answer here._
 
@@ -30,7 +30,7 @@ _Your answer here._
 
 ### 2.2 — Postmortem
 
-> Write a postmortem for the incident described in the README. Cover: timeline, root cause, contributing factors, impact, and as many action items as the incident genuinely warrants (at least three).
+> Write a postmortem for the incident described in the README. Cover: timeline, root cause, contributing factors, impact, and as many action items as the incident warrants (at least three).
 
 **Timeline** _(add as many rows as the incident warrants)_
 
@@ -48,7 +48,7 @@ _Your contributing factors here._
 
 **Impact**
 
-_Your impact assessment here. Quantify where you can — failed requests,
+_Your impact assessment here. Quantify where you can: failed requests,
 affected user cohort, any patient-safety-relevant flows touched._
 
 **Action Items** _(add as many rows as warranted)_
@@ -65,7 +65,7 @@ affected user cohort, any patient-safety-relevant flows touched._
 
 > Your completed [`part3/reliability.yaml`](./part3/reliability.yaml) is the primary answer.
 >
-> One short paragraph here: is memory-based HPA appropriate for `team-alpha-backend` given the Part 2.2 failure mode (memory leak → OOMKill)? Implement the spec as written, but explain whether you would actually keep the memory metric in production and why.
+> One short paragraph here: is memory-based HPA appropriate for `team-alpha-backend` given the Part 2.2 failure mode (memory leak triggering OOMKill)? Implement the spec as written, but explain whether you would actually keep the memory metric in production and why.
 
 _Your evaluation here._
 
@@ -119,7 +119,7 @@ _Your answer here._
 
 > Your completed [`part5/cronjob.yaml`](./part5/cronjob.yaml) is the primary answer.
 >
-> Briefly address here: (a) Kubernetes already provides `ttlSecondsAfterFinished` and a pod GC — what does your CronJob add on top, and would you pick a different target? (b) Cluster-wide `get/list/delete` on pods and jobs in a PHI-handling multi-tenant cluster — what are the security implications and how would you mitigate them?
+> Briefly address here: (a) Kubernetes already provides `ttlSecondsAfterFinished` and a pod GC, so what does your CronJob add on top, and would you pick a different target? (b) Cluster-wide `get/list/delete` on pods and jobs in a PHI-handling multi-tenant cluster: what are the security implications and how would you mitigate them?
 
 _Your notes here._
 
@@ -129,7 +129,7 @@ _Your notes here._
 
 ### 6.1 — Cascading Failure
 
-> Walk through your investigation of the cascading failure described in the README. How do you identify the root cause is Service B — not Service A — and what do you do about it?
+> Walk through your investigation of the cascading failure described in the README. How do you identify the root cause as Service B (rather than Service A), and what do you do about it?
 
 _Your answer here._
 

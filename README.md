@@ -1,6 +1,6 @@
 # Dawn Health — Site Reliability Engineer Technical Assessment
 
-> **Suggested time:** ~4 hours | **We deeply respect your time** — it is fine to skip tasks; just document your intended approach in [`SUBMISSION.md`](./SUBMISSION.md).
+> **Suggested time:** plan for one focused evening or a half-day. Depth is more useful to us than coverage. **We deeply respect your time** — it is fine to skip tasks; just document your intended approach in [`SUBMISSION.md`](./SUBMISSION.md).
 
 ---
 
@@ -44,35 +44,34 @@ We favour a well-reasoned, incomplete answer over a working but thoughtless one.
 Part 1 (SLOs and burn-rate alerting) ~25%, Part 2 (runbook + postmortem) ~20%,
 Part 3 (reliability + capacity) ~15%, Part 4 (observability + dashboards) ~15%,
 Part 5 (toil + automation) ~10%, Part 6 (operational scenarios) ~15%. Use this
-to budget your time — depth on a few questions beats shallow coverage of all.
+to budget your time.
 
 ### Definitions used in this assessment
 
-- **MTTR** — Mean Time To **Recovery** (page → service restored to within SLO).
-  Not MTBF, not MTTD, not MTTR-as-repair.
-- **P1** — a customer-impacting incident affecting more than 5% of requests
-  or any patient-safety-relevant flow. Pages immediately, requires an incident
+- **MTTR**: Mean Time To Recovery (from page to service restored within SLO).
+- **P1**: a customer-impacting incident affecting more than 5% of requests, or
+  any patient-safety-relevant flow. Pages immediately, requires an incident
   channel and a postmortem.
-- **P2** — degraded service or partial impact that does not warrant a page but
-  needs same-business-day response.
-- **SaMD** — Software as a Medical Device. Means change control,
-  audit trails, and clinical-impact reasoning are part of the engineering
-  bar, not separate from it.
+- **P2**: degraded or partial impact that does not warrant a page but needs
+  same-business-day response.
+- **SaMD**: Software as a Medical Device. Change control, audit trails, and
+  clinical-impact reasoning are part of the engineering bar, not separate
+  from it.
 
 ### If the SRE Workbook vocabulary is new to you
 
-We lean on Google SRE Workbook terminology (burn rate, multi-window
-alerting, toil, error budget) and Prometheus idioms (recording rules,
-`histogram_quantile`, label selectors). If your SRE background uses different
-names for the same concepts, these are good starting points:
+We use Google SRE Workbook terminology (burn rate, multi-window alerting,
+toil, error budget) and Prometheus idioms (recording rules,
+`histogram_quantile`, label selectors). If you know the same concepts under
+different names, these are good starting points:
 
 - [Implementing SLOs (SRE Workbook ch. 2)](https://sre.google/workbook/implementing-slos/)
 - [Alerting on SLOs (SRE Workbook ch. 5)](https://sre.google/workbook/alerting-on-slos/)
 - [Eliminating toil (SRE book ch. 5)](https://sre.google/sre-book/eliminating-toil/)
-- [Prometheus best practices — recording rules and naming](https://prometheus.io/docs/practices/rules/)
+- [Prometheus best practices: recording rules and naming](https://prometheus.io/docs/practices/rules/)
 
-We are not checking whether you have memorised the workbook — we are
-checking whether you can apply the underlying ideas.
+We are not checking whether you have memorised the workbook; we are checking
+whether you can apply the ideas.
 
 ---
 
@@ -135,7 +134,7 @@ In [`SUBMISSION.md`](./SUBMISSION.md#13--slo-policy):
 
 - What SLO target would you propose for a patient-facing API, and how would
   you justify it to product stakeholders who want to move fast?
-- How would you use the error budget to govern releases — specifically, to
+- How would you use the error budget to govern releases, in particular to
   decide whether a release should proceed?
 - What should happen when the error budget is exhausted?
 
@@ -165,7 +164,7 @@ In [`SUBMISSION.md`](./SUBMISSION.md#22-postmortem), write a postmortem for the 
 
 > **Incident summary**: At 02:14, `team-alpha-backend` began returning HTTP 503s. By 02:19, 40% of requests were failing. Root cause: a memory leak introduced in a release at 01:55 caused all three pods to be OOMKilled by the kernel within 4 minutes of each other. The kubelet restarted each container per the pod's restart policy, and the `livenessProbe` also failed during the brief recovery windows, but the leak drove each pod back over its memory limit within ~90 seconds. The service was fully restored at 02:47 by rolling back via ArgoCD. Total impact: 33 minutes of degraded service.
 
-Your postmortem should cover: timeline, root cause, contributing factors, impact, and **as many** action items as the incident genuinely warrants — at least three.
+Your postmortem should cover: timeline, root cause, contributing factors, impact, and as many action items as the incident warrants (at least three).
 
 ---
 
@@ -182,19 +181,18 @@ incident scenario) with no autoscaling or disruption protection. Add to
 [`part3/reliability.yaml`](./part3/reliability.yaml):
 
 1. A **HorizontalPodAutoscaler** that scales the Deployment between 2 and 10
-   replicas, with **CPU at 70% utilisation** as the primary scaling signal.
-   The original brief also called for memory at 80% utilisation — implement
-   it, but evaluate critically: given the Part 2.2 failure mode (memory leak
-   triggering OOMKill), is memory-based scaling appropriate here, or does it
-   create a feedback loop that just delays the real fix? State your reasoning
-   in [`SUBMISSION.md`](./SUBMISSION.md#31--hpa-and-poddisruptionbudget).
+   replicas, with CPU at 70% utilisation as the primary scaling signal. The
+   original brief also called for memory at 80% utilisation. Implement it,
+   but think about whether memory-based scaling is appropriate given the
+   Part 2.2 failure mode (memory leak triggering OOMKill), and note your
+   reasoning in [`SUBMISSION.md`](./SUBMISSION.md#31--hpa-and-poddisruptionbudget).
 2. A **PodDisruptionBudget** that ensures at least 1 pod is always available
    during voluntary disruptions (e.g. node drain, cluster upgrades).
 
-> Note on HPA semantics: `averageUtilization` is computed as a percentage of
-> the pod's resource **requests**, not its limits. With
+> A note on HPA semantics: `averageUtilization` is computed as a percentage
+> of the pod's resource **requests**, not its limits. With
 > `requests.memory: 256Mi`, an 80% target triggers scaling at ~205Mi per pod
-> on average — well below the 512Mi limit.
+> on average, well below the 512Mi limit.
 
 ### Task 3.2 — Resource Strategy (Written)
 
@@ -226,9 +224,9 @@ A starter investigation document is provided at [`part4/queries.md`](./part4/que
 
 The file describes a live incident scenario and asks you to write PromQL and LogQL queries to investigate it. Fill in the `TODO` blocks for each question.
 
-We are looking for production-fidelity queries — labelled, scoped to the right
+We are looking for production-fidelity queries: labelled, scoped to the right
 namespace and pod selector, and with rate windows that make sense for an
-incident-response timescale (not 24h). An example template is provided in
+incident-response timescale (not 24h). A worked example is included in
 [`part4/queries.md`](./part4/queries.md) so you know what level of detail we
 expect.
 
@@ -272,11 +270,11 @@ Two things to address alongside the manifest in
 - Kubernetes already provides `Job.spec.ttlSecondsAfterFinished` and a pod
   garbage collector. Treat this CronJob as a belt-and-braces sweep that
   catches what those don't (e.g. evicted pods, orphaned ConfigMaps,
-  completed Argo Workflows) — or argue for a different target entirely.
+  completed Argo Workflows), or argue for a different target entirely.
 - Cluster-wide `get/list/delete` on pods and jobs is a sensitive grant in a
   multi-tenant cluster handling PHI: pod names, labels, and image tags can
-  leak tenant context. Discuss the security trade-offs and what you would do
-  to mitigate them.
+  leak tenant context. Note the security trade-offs and how you would
+  mitigate them.
 
 ---
 
@@ -298,9 +296,10 @@ How do you hand off? What do you communicate, in what format, to ensure the inco
 
 ### 6.3 — Noisy Alerting *(Optional)*
 
-The team is receiving 40–60 alert notifications per **day**, with an average
-of 5 after-hours pages per week, ~80% of which result in no action. Engineers
-are starting to ignore pages — including the ones that turn out to matter.
+The team is receiving 40–60 alert notifications per day, with an average of
+5 after-hours pages per week, and ~80% of pages result in no action.
+Engineers are starting to ignore pages, including the ones that turn out to
+matter.
 
 How would you audit and reduce alert noise without reducing coverage for real
 incidents? Walk through your approach.

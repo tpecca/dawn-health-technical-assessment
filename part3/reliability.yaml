@@ -14,10 +14,10 @@
 #      - Scales up when average memory utilisation across pods exceeds 80%
 #
 #      Note: HPA `averageUtilization` is a percentage of the pod's resource
-#      *requests*, not its limits. With requests.cpu: 200m, 70% means an average
+#      requests, not its limits. With requests.cpu: 200m, 70% means an average
 #      of 140m per pod across the Deployment. Briefly evaluate whether scaling
-#      on memory is appropriate for this workload — see Part 2.2 for the
-#      relevant failure mode — and note your reasoning in SUBMISSION.md if you
+#      on memory is appropriate for this workload (see Part 2.2 for the
+#      relevant failure mode) and note your reasoning in SUBMISSION.md if you
 #      choose to depart from the spec.
 #
 #   2. Add a PodDisruptionBudget (PDB) that:
@@ -36,7 +36,7 @@ metadata:
     app: team-alpha-backend
 spec:
   # Matches the three-pod incident scenario in Part 2.2. The HPA's minReplicas
-  # will scale this down if usage is low.
+  # can scale this down if usage is low.
   replicas: 3
   selector:
     matchLabels:

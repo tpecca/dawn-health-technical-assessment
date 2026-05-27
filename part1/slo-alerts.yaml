@@ -1,7 +1,7 @@
 # Part 1.2 — Starter: Multi-Window SLO Burn-Rate Alerts
 #
 # SLO: 99.9% of requests to team-alpha-backend succeed over a rolling 28-day window.
-# This means the error budget is 0.1% of requests — or approximately 40 minutes
+# This means the error budget is 0.1% of requests, or approximately 40 minutes
 # of complete outage per 28-day window (0.001 * 28 * 24 * 60 ≈ 40.3 min).
 #
 # Multi-window, multi-burn-rate alerting (Google SRE Workbook §5) avoids the
@@ -23,10 +23,9 @@
 #   2. The burn-rate thresholds are provided in comments — use them correctly.
 #   3. Fill in the description and action annotations with meaningful content.
 #
-# Note on recording rules: Part 1.1 ships a 5m ratio. You will also need a 1h
-# ratio for the fast-burn alert and a 6h ratio for the slow-burn alert. Either
-# extend part1/recording-rules.yaml with the additional windows, or define them
-# inline here — your choice, document it.
+# Note on recording rules: Part 1.1 ships 5m and 1h ratios. You will also need
+# a 6h ratio for the slow-burn alert. Extend part1/recording-rules.yaml or
+# define it inline here (your choice), but document it.
 
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -48,7 +47,7 @@ spec:
         - alert: TeamAlphaBackendHighErrorBudgetBurn
           expr: |
             # TODO: Express the condition using the recording rules from Part 1.1
-            # (you will need a 1h ratio rule — add one if you have not already).
+            # (you will need a 1h ratio rule; add one if you have not already).
             # The alert should fire when BOTH of the following are true:
             #   - The 1h error ratio exceeds 14x the SLO error rate (0.1% * 14 = 1.4%, i.e. > 0.014)
             #   - The 5m error ratio also exceeds 14x (confirms it is still active)

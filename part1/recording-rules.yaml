@@ -12,9 +12,10 @@
 #
 # Your tasks:
 #   1. Complete the PromQL expression for each recording rule.
-#   2. The naming convention level:metric:operation is intentional — keep it.
-#      The metric token should reflect what is *measured* (e.g. http_requests),
-#      not a synthesised name like http_errors_total which does not exist as a series.
+#   2. The naming convention level:metric:operation is intentional, keep it.
+#      The metric token should reflect what is actually measured (e.g.
+#      http_requests), not a synthesised name like http_errors_total which
+#      does not exist as a series.
 #   3. Add a comment on each rule explaining what it measures and why it is
 #      useful for SLO tracking.
 #   4. Part 1.2 needs both 5m and 1h error ratio rules. Both are stubbed below.
@@ -43,7 +44,7 @@ spec:
             # Use rate() over a 5m window.
             TODO
 
-        # Error ratio (5m) — proportion of 5xx responses relative to all requests,
+        # Error ratio (5m): proportion of 5xx responses relative to all requests,
         # expressed as a value between 0 and 1 (0.001 = 0.1% error rate).
         - record: job:http_requests:error_ratio5m
           expr: |
@@ -53,7 +54,7 @@ spec:
             # Result should be a value between 0 and 1.
             TODO
 
-        # Error ratio (1h) — same calculation as above but over a 1h window.
+        # Error ratio (1h): same calculation as above but over a 1h window.
         # Used by the fast-burn alert in Part 1.2 to confirm a sustained trend
         # before paging.
         - record: job:http_requests:error_ratio1h
