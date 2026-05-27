@@ -47,7 +47,7 @@ spec:
         - alert: TeamAlphaBackendHighErrorBudgetBurn
           expr: |
             # TODO: Express the condition using the recording rules from Part 1.1
-            # (you will need a 1h ratio rule; add one if you have not already).
+            # (job:http_requests:error_ratio5m and :error_ratio1h are provided).
             # The alert should fire when BOTH of the following are true:
             #   - The 1h error ratio exceeds 14x the SLO error rate (0.1% * 14 = 1.4%, i.e. > 0.014)
             #   - The 5m error ratio also exceeds 14x (confirms it is still active)
