@@ -39,34 +39,98 @@ spec:
         # broken down by status code so errors and successes can be separated.
         - record: job:http_requests_total:rate5m
           expr: |
-            # TODO: Write a PromQL expression for per-second request rate
-            # broken down by job, namespace, and status_code.
-            # Use rate() over a 5m window.
-            TODO
+            sum by (job, namespace, status_code) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha"
+            }[5m])
+            )
 
         # Error ratio (5m): proportion of 5xx responses relative to all requests,
         # expressed as a value between 0 and 1 (0.001 = 0.1% error rate).
         - record: job:http_requests:error_ratio5m
           expr: |
-            # TODO: Write a PromQL expression for the 5xx error ratio.
-            # Numerator: rate of requests where status_code starts with "5"
-            # Denominator: rate of all requests
-            # Result should be a value between 0 and 1.
-            TODO
+            sum by (job, namespace) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha",
+                status_code=~"5.."
+              }[5m])
+            )
+            /
+            sum by (job, namespace) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha"
+              }[5m])
+            )
 
         # Error ratio (1h): same calculation as above but over a 1h window.
         # Used by the fast-burn alert in Part 1.2 to confirm a sustained trend
         # before paging.
         - record: job:http_requests:error_ratio1h
           expr: |
-            # TODO: Same as above but with a 1h rate window.
-            TODO
+            sum by (job, namespace) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha",
+                status_code=~"5.."
+              }[1h])
+            )
+            /
+            sum by (job, namespace) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha"
+              }[1h])
+            )
 
+        ## Extended the requested task on part 1.2
+        # Error ratio (30m) as a short confirmation before the slow-burn alert
+        # Paired with the 6h ratio to confirm if the trend is still active right now
+        - record: job:http_requests:error_ratio30m
+          expr: |
+            sum by (job, namespace) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha",
+                status_code=~"5.."
+              }[30m])
+            )
+            /
+            sum by (job, namespace) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha"
+              }[30m])
+            )
+
+        # Error ratio (6h) as the primary long window for the slow-burn alert 
+        - record: job:http_requests:error_ratio6h
+          expr: |
+            sum by (job, namespace) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha",
+                status_code=~"5.."
+              }[6h])
+            )
+            /
+            sum by (job, namespace) (
+              rate(http_requests_total{
+                job="team-alpha-backend",
+                namespace="team-alpha"
+              }[6h])
+            )
+            
         # p95 latency — 95th percentile request duration over a 5m window.
         # Used to track latency SLIs and identify tail-latency degradation.
         - record: job:http_request_duration_seconds:p95_rate5m
           expr: |
-            # TODO: Write a PromQL expression for p95 request latency.
-            # Use histogram_quantile(0.95, ...) with rate() over a 5m window.
-            # Aggregate by job and namespace.
-            TODO
+            histogram_quantile(0.95, 
+              sum by (job, namespace, le)
+                rate(http_request_duration_seconds_bucket{
+                  job="team-alpha-backend",
+                  namespace="team-alpha"
+                }[5m])
+              )
