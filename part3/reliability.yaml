@@ -72,3 +72,46 @@ spec:
             limits:
               cpu: 1000m
               memory: 512Mi
+---
+## HorizontalPodAutoscaler
+# Memory scaling caveat (as mentioned in SUBMISSION.md): memory-based scaling is
+# implemented as specified but should be removed for this workload in production.
+# A memory leak causes memory growth regardless of load; scaling out only adds more
+# leaking pods, accelerating cluster-level exhaustion. CPU scaling can be better here
+apiVersion: autoscaling/v2 # if we go for CPU scaling in prod later, we can also use v1 API
+kind: HorizontalPodAutoscaler
+metadata:
+  name: team-alpha-backend-hpa
+  namespace: team-alpha
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: team-alpha-backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: resource
+      resource:
+        name: cpu
+        target:
+          type: averageUtilization
+          averageUtilization: 70
+    - type: resource
+      resource:
+        name: memory
+        target:
+          type: averageUtilization
+          averageUtilization: 80
+---
+## PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: team-alpha-backend-pdb
+  namespace: team-alpha
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: team-alpha-backend
