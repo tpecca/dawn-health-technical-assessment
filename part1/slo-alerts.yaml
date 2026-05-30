@@ -46,26 +46,67 @@ spec:
         # Threshold for 99.9% SLO: 14x burn rate = error ratio > 0.014 (1.4%)
         - alert: TeamAlphaBackendHighErrorBudgetBurn
           expr: |
-            # TODO: Express the condition using the recording rules from Part 1.1
-            # (job:http_requests:error_ratio5m and :error_ratio1h are provided).
-            # The alert should fire when BOTH of the following are true:
-            #   - The 1h error ratio exceeds 14x the SLO error rate (0.1% * 14 = 1.4%, i.e. > 0.014)
-            #   - The 5m error ratio also exceeds 14x (confirms it is still active)
-            TODO
+            job:http_requests:error_ratio1h{job="team-alpha-backend", namespace="team-alpha"} > 0.014
+            and
+            job:http_requests:error_ratio5m{job="team-alpha-backend", namespace="team-alpha"} > 0.014            
           for: 2m
           labels:
             severity: critical
             team: team-alpha
             component: backend
           annotations:
-            summary: "High error budget burn on team-alpha-backend ({{ $value | humanizePercentage }} error rate)"
+            summary: "High error budget burn on {{ $labels.job }} ({{ $value | humanizePercentage }} error rate)"
             description: |
-              TODO: Explain what this alert means in terms of error budget.
-              At the current burn rate, how quickly will the 28-day budget be exhausted?
-              What is the patient-facing impact?
+              The 1h error ratio on {{ $labels.job }} in namespace {{ $labels.namespace }}
+              exceeds 1.4% — 14x the 0.1% SLO error rate.
+              At this burn rate the entire 28-day error budget will be exhausted in approximately 2 days.
+              Patient-facing API requests are failing. Treat this as a P1 incident.
             action: |
-              TODO: List the first 3 steps an on-call engineer should take immediately.
-              Include specific kubectl or Grafana commands.
+              Step 1 — Check pod health
+              kubectl get pods -n {{ $labels.namespace }} -l app={{ $labels.job }} -o wide
+              Look for: non-Running pods, high restart counts, recent AGE resets.
+
+              Step 2 — Check recent logs for errors
+              kubectl logs -n {{ $labels.namespace }} -l app={{ $labels.job }} --tail=100 --since=5m
+
+              Step 3 — Check for a recent deployment
+              kubectl rollout history deployment/{{ $labels.job }} -n {{ $labels.namespace }}
+
+              If a recent rollout correlates with the alert onset, roll back immediately via ArgoCD:
+                1. Open ArgoCD and select {{ $labels.job }}
+                2. Go to History and Rollback, select the last known-good revision, click Rollback
+
+              If no recent rollout, continue to Step 4.
+
+              Step 4 — Check for OOMKills
+              kubectl describe pods -n {{ $labels.namespace }} -l app={{ $labels.job }} | grep -i oomkill
+
+              If OOMKill confirmed (exit code 137), check the memory trend to distinguish a leak from a traffic spike:
+              container_memory_working_set_bytes{namespace="{{ $labels.namespace }}", pod=~"{{ $labels.job }}.*"}
+
+                Memory growing steadily for hours with flat traffic (leak):
+                  - Scale out immediately to buy time while the root cause is investigated:
+                    kubectl scale deployment/{{ $labels.job }} -n {{ $labels.namespace }} --replicas=6
+                  - Page the dev team for emergency investigation.
+                  - Re-check rollout history for any deployment in the last 24h:
+                    kubectl rollout history deployment/{{ $labels.job }} -n {{ $labels.namespace }}
+                    If a deployment is found: roll back via ArgoCD.
+                    If not: dev team must hotfix the current version.
+
+                Memory spiked suddenly alongside a traffic increase (traffic spike):
+                  - Confirm the request rate is unusually high:
+                    sum(rate(http_requests_total{namespace="{{ $labels.namespace }}", job="{{ $labels.job }}"}[5m]))
+                  - Check whether the HPA is already scaling to handle the load:
+                    kubectl get hpa -n {{ $labels.namespace }}
+                  - If HPA has already hit maxReplicas, manually scale beyond it to relieve pressure:
+                    kubectl scale deployment/{{ $labels.job }} -n {{ $labels.namespace }} --replicas=10
+                  - If traffic looks like a bot or retry storm, investigate the upstream caller
+                    and consider rate limiting before scaling further.
+
+              If no OOMKill is found:
+                - Check downstream dependencies (database, external APIs) for failures or elevated latency.
+                - Check the Azure status page for any active infrastructure incidents.
+
 
         # Slow burn — warning
         # Fires when a lower but sustained error rate will exhaust the budget within ~5 days.
@@ -73,20 +114,39 @@ spec:
         # Threshold for 99.9% SLO: 6x burn rate = error ratio > 0.006 (0.6%)
         - alert: TeamAlphaBackendMediumErrorBudgetBurn
           expr: |
-            # TODO: Same pattern as above but using 6h and 30m windows.
-            # Threshold: 6x burn rate = error ratio > 0.006 (0.6%)
-            # Both the 6h and 30m ratios must exceed the threshold.
-            TODO
+            job:http_requests:error_ratio6h{job="team-alpha-backend", namespace="team-alpha"} > 0.006
+            and
+            job:http_requests:error_ratio30m{job="team-alpha-backend", namespace="team-alpha"} > 0.006
           for: 15m
           labels:
             severity: warning
             team: team-alpha
             component: backend
           annotations:
-            summary: "Elevated error budget burn on team-alpha-backend ({{ $value | humanizePercentage }} error rate)"
+            summary: "Elevated error budget burn on {{ $labels.job }} ({{ $value | humanizePercentage }} error rate)"
             description: |
-              TODO: Explain the impact of this burn rate on the 28-day error budget.
-              At 6x burn rate, when will the budget be exhausted?
+              The 6h error ratio on {{ $labels.job }} in namespace {{ $labels.namespace }}
+              exceeds 0.6% — 6x the 0.1% SLO error rate.
+              At this burn rate the full 28-day error budget will be exhausted in approximately 4.7 days.
+              This does not require an immediate page — investigate within business hours.
             action: |
-              TODO: First 3 steps an on-call engineer should take.
-              At this severity level, is immediate action required or can it wait for business hours?
+              This is a warning. Immediate action is not required but the trend must be
+              investigated within business hours to prevent budget exhaustion.
+
+              Step 1 — Assess the trend direction in Grafana
+              Open the {{ $labels.job }} SLO dashboard and check whether the error ratio
+              is rising, flat, or recovering. A rising trend is more urgent than a flat one.
+
+              Step 2 — Check recent logs for recurring errors
+              kubectl logs -n {{ $labels.namespace }} -l app={{ $labels.job }} --since=1h | grep -i error
+
+              Step 3 — Check for a recent deployment that may have introduced the elevated rate
+              kubectl rollout history deployment/{{ $labels.job }} -n {{ $labels.namespace }}
+              If a deployment correlates with the onset, flag it to the dev team for review.
+              A rollback is not required at this severity unless the trend worsens to critical.
+
+              Step 4 — If no deployment found, check downstream dependencies
+              Look for elevated latency or error rates in services that {{ $labels.job }} depends on.
+              A slow dependency can cause a sustained low-level error rate without triggering
+              the fast-burn threshold.
+
