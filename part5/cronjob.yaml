@@ -48,17 +48,49 @@ metadata:
     # Marks this namespace as belonging to the platform team, not a product tenant.
     dawnhealth.com/owner: platform
 ---
+## Dedicated ServiceAccount for the cleanup job.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: platform-cleanup-sa
+  namespace: platform-system
+---
+## ClusterRole
+# Helps allow cleanup job across namespaces
+# Configured with the only minimum required verbs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-cleanup-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "delete"]
+---
+## Role Binding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-cleanup-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-cleanup-role
+subjects:
+  - kind: ServiceAccount
+    name: platform-cleanup-sa
+    namespace: platform-system
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: cleanup-stale-resources
   namespace: platform-system
 spec:
-  schedule: "TODO"         # TODO: Set a cron schedule that runs every hour
-  # Replace cancels any still-running prior instance before starting a new one.
-  # Cleanup is short and idempotent, so we prefer Replace over Forbid to avoid
-  # piling up if a previous run hangs on a slow API server. Either is
-  # defensible; justify your choice in SUBMISSION.md if you change it.
+  schedule: "0 * * * *" # Runs every hour
   concurrencyPolicy: Replace
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 1
@@ -66,7 +98,7 @@ spec:
     spec:
       template:
         spec:
-          serviceAccountName: TODO  # TODO: Reference the ServiceAccount defined below
+          serviceAccountName: platform-cleanup-sa
           restartPolicy: OnFailure
           containers:
             - name: kubectl
@@ -83,13 +115,44 @@ spec:
                 - /bin/sh
                 - -c
                 - |
-                  # TODO: Write the shell commands to:
-                  #   1. Delete all Succeeded pods across all namespaces
-                  #   2. Delete all Failed pods across all namespaces
-                  #   3. Delete completed Jobs older than 24 hours
-                  #
-                  # Hint: kubectl delete pods --field-selector=... --all-namespaces
-                  # Hint: for Jobs, you may need to combine kubectl get and kubectl delete
-                  #
-                  # Add an echo before each step so the job logs are readable.
-                  echo "TODO: implement cleanup"
+                  set -e
+
+                  echo "[$(date -u)] Step 1: Deleting Succeeded pods across all namespaces..."
+                  kubectl delete pods \
+                    --field-selector=status.phase=Succeeded \
+                    --all-namespaces \
+                    --ignore-not-found=true
+                  echo "[$(date -u)] Step 1 done."
+
+                  echo "[$(date -u)] Step 2: Deleting Failed pods across all namespaces..."
+                  kubectl delete pods \
+                    --field-selector=status.phase=Failed \
+                    --all-namespaces \
+                    --ignore-not-found=true
+                  echo "[$(date -u)] Step 2 done."
+
+                  echo "[$(date -u)] Step 3: Deleting completed Jobs older than 24 hours..."
+                  ### kubectl has no built-in filter for completionTime, so we use jq
+                  ### fromdateiso8601 converts the RFC 3339 completionTime to Unix epoch
+                  ### for comparison against our cutoff. The pipeline is safe because
+                  ### ignore flag makes each delete idempotent.
+
+                  CUTOFF_EPOCH=$(( $(date +%s) - 86400))
+                  kubectl get jobs -all-namespaces -o json | \
+                    jq -r --argjson cutoff "$CUTOFF_EPOCH" '
+                    .items[] |
+                    select(
+                      (.status.conditions // []) | any(.type == "Complete")
+                    ) |
+                    select(
+                      .status.completionTime != null and
+                      (.status.COmpletionTime | fromdateiso8601) < $cutoff
+                    ) |
+                    "\(.metadata.namespace)/\(.metadata.name)"
+                    ' | while IFS='/' read -r ns name; do
+                      echo " Deleting job ${name} in namespace ${ns}"
+                      kubectl delete job "${name}" --namespace "${ns}" --ignore-not-found=true
+                    done
+                  echo "[$(date -u)] Step 3 done."
+
+                  echo "[$(date -u)] Cleanup complete."
